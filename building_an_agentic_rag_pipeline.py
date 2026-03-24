@@ -107,13 +107,23 @@ print("Chroma DB and Retriever initialized.")
 We load a local Large Language Model (`google/flan-t5-base`) using the `transformers` pipeline for text generation. This LLM will be used to generate answers based on the retrieved context.
 """
 
-# Initialize the text generation pipeline with 'google/flan-t5-base' model
-llm = pipeline(
-    "text-generation",
-    model="google/flan-t5-base",
-    max_new_tokens=150 # Limit the number of generated tokens
-)
-print("Local LLM ('google/flan-t5-base') loaded.")
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+# Load the tokenizer and model for Flan-T5
+tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-base")
+model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-base")
+
+def custom_llm_generate(prompt, max_new_tokens=500):
+    inputs = tokenizer(prompt, return_tensors="pt")
+    outputs = model.generate(
+        input_ids=inputs.input_ids,
+        attention_mask=inputs.attention_mask,
+        max_new_tokens=max_new_tokens
+    )
+    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+llm = custom_llm_generate # Replace the pipeline object with our custom generation function
+print("Local LLM ('google/flan-t5-base') loaded with direct model usage.")
 
 """### 6. Define Agent Controller
 
@@ -154,8 +164,9 @@ def rag_answer(query):
         # If no search is needed, the final prompt is just the original query
         final_prompt = query
 
-    # Generate the response using the loaded LLM
-    response = llm(final_prompt)[0]["generated_text"]
+    # Generate the response using the loaded LLM (custom_llm_generate)
+    # The custom_llm_generate function returns a string directly.
+    response = llm(final_prompt)
     return response
 
 # --- Test the RAG Pipeline ---
